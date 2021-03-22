@@ -1,0 +1,34 @@
+image: ddgg/php_2020:build_v1
+
+pipelines:
+  default:
+    - step:
+        caches:
+          - composer
+          - node
+        services:
+          - mysql
+          - redis
+        script:
+          - pushd 10_laravel_tdd/project/
+          -   composer install
+          -   cp .env.example .env
+          -   php artisan key:generate
+          -   vendor/bin/phpunit --log-junit tests/_output/test_report.xml
+          -   php artisan serve --port 8888 &
+          -   while ! timeout 1 bash -c "echo > /dev/tcp/localhost/8888"; do echo "Waiting for server..."; sleep 1; done
+          -   vendor/bin/codecept run --xml test_report.xml
+          -   killall php php7.4
+          - popd
+          - .ci/collect_reports.sh
+definitions:
+  services:
+    mysql:
+      image: mysql:8.0
+      variables:
+        MYSQL_ROOT_PASSWORD: root123
+        MYSQL_DATABASE: test
+        MYSQL_USER: test
+        MYSQL_PASSWORD: test123
+    redis:
+      image: redis
